@@ -5,6 +5,19 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface ICindr is IERC20 {
     /**
+     * @notice Event emitted when tokens or ETH are recovered.
+     * @param to The address to which the recovered tokens or ETH are sent.
+     * @param amount The amount of tokens or ETH recovered.
+     */
+    event TokensRecovered(address indexed to, uint256 amount);
+
+    /**
+     * @notice Event emitted when the maximum transaction amount is updated.
+     * @param maxTxPercent The new maximum transaction amount percentage.
+     */
+    event MaxTxPercentUpdated(uint256 maxTxPercent);
+
+    /**
      * @dev Error for insufficient token balance.
      * @param account The address of the account with insufficient balance.
      * @param balance The current token balance of the account.

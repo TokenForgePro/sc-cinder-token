@@ -54,11 +54,15 @@ contract CindrFuzzTest is Test {
         uniswapV2Pair = CindrToken.uniswapV2Pair();
 
         CindrToken.approve(UNISWAP_V2_ROUTER02, type(uint256).max);
-        uniswapV2Router.addLiquidityETH{value: 10 ether}(
+
+        uint256 tokenAmountForAddingLiquidity = totalSupply / 4;
+        uint256 ethAmountToAddLiquidity = 10 ether;
+
+        uniswapV2Router.addLiquidityETH{value: ethAmountToAddLiquidity}(
             address(CindrToken),
             totalSupply / 4,
-            0,
-            0,
+            (tokenAmountForAddingLiquidity * 850) / 1000, // 15% slippage tolerance
+            (ethAmountToAddLiquidity * 850) / 1000, // 15% slippage tolerance
             owner,
             block.timestamp
         );

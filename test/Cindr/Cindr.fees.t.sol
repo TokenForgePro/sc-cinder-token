@@ -96,12 +96,13 @@ contract CindrTokenFeesTest is Test {
     }
 
     function testSetMaxTxPercent() public {
-        uint256 newMaxTxPercent = 5; // 5%
+        uint256 newMaxTxPercent = 50; // 5.0%
 
         CindrToken.setMaxTxPercent(newMaxTxPercent);
 
         uint256 expectedMaxTxAmount = (CindrToken.totalSupply() *
-            newMaxTxPercent) / 100;
+            newMaxTxPercent) / (10 ** 3);
+
         assertEq(
             CindrToken._maxTxAmount(),
             expectedMaxTxAmount,

@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {IUniswapV2Factory} from "src/interfaces/IUniswapV2Factory.sol";
 import {IUniswapV2Router02} from "src/interfaces/IUniswapV2Router02.sol";
@@ -13,7 +14,7 @@ import {ICindr} from "src/interfaces/ICindr.sol";
  * @dev Implementation of the Cindr Token with reflection mechanism, auto liquidity, and fees for marketing and development.
  * Inspired by SafeMoon mechanisms and code: https://github.com/safemoonprotocol/Safemoon.sol/blob/main/Safemoon.sol
  */
-contract Cindr is ICindr, Ownable {
+contract Cindr is ICindr, Ownable, ReentrancyGuard {
     /************************************* Token description ****************************************/
     /// @notice Token name
     string private _name;
@@ -22,7 +23,7 @@ contract Cindr is ICindr, Ownable {
     string private _symbol;
 
     /// @notice Token decimals
-    uint16 private _decimals = 9;
+    uint16 private constant _decimals = 9;
     /************************************************************************************************/
 
     /********************************** ERC20 Token mappings ****************************************/
@@ -108,8 +109,8 @@ contract Cindr is ICindr, Ownable {
 
     /// @notice Number of tokens to sell and add to liquidity
     uint256 private numTokensSellToAddToLiquidity = 5_000_000 * 10 ** 9;
-    /************************************************************************************************/
 
+    /********************************* Events ************************************/
     /**
      * @dev Prevents reentrancy during the swap and liquify process
      * Sets the inSwapAndLiquify flag to true before executing the function and resets it to false after the function execution
@@ -146,7 +147,6 @@ contract Cindr is ICindr, Ownable {
         // Ensure the parameters are valid
         require(bytes(name_).length > 0, "Token name cannot be empty");
         require(bytes(symbol_).length > 0, "Token symbol cannot be empty");
-
         require(totalSupply_ > 0, "Total supply must be greater than zero");
         require(
             _uniswapV2RouterAddress != address(0),
@@ -156,16 +156,15 @@ contract Cindr is ICindr, Ownable {
             _marketingWallet != address(0),
             "Marketing wallet address cannot be zero address"
         );
-
-        require(_taxFee <= 1000, "Tax fee must be between 0 and 100");
-        require(_burnFee <= 1000, "Burn fee must be between 0 and 100");
+        require(_taxFee <= 100, "Tax fee must be between 0 and 10%");
+        require(_burnFee <= 100, "Burn fee must be between 0 and 10%");
         require(
-            _liquidityFee <= 1000,
-            "Liquidity fee must be between 0 and 100"
+            _liquidityFee <= 100,
+            "Liquidity fee must be between 0 and 10%"
         );
         require(
-            _marketingFee <= 1000,
-            "Marketing fee must be between 0 and 100"
+            _marketingFee <= 100,
+            "Marketing fee must be between 0 and 10%"
         );
 
         _tTotal = totalSupply_ * 10 ** 6 * 10 ** _decimals;
@@ -260,6 +259,8 @@ contract Cindr is ICindr, Ownable {
      * @dev See {ICindr-excludeFromReward}.
      */
     function excludeFromReward(address account) external onlyOwner {
+        require(account != address(0), "Account is the zero address");
+
         require(
             account != address(uniswapV2Router),
             "We can not exclude Uniswap router."
@@ -279,6 +280,8 @@ contract Cindr is ICindr, Ownable {
      * @dev See {ICindr-includeInReward}.
      */
     function includeInReward(address account) external onlyOwner {
+        require(account != address(0), "Account is the zero address");
+
         require(_isExcluded[account], "Account is already excluded");
         for (uint256 i = 0; i < _excluded.length; i++) {
             if (_excluded[i] == account) {
@@ -309,8 +312,9 @@ contract Cindr is ICindr, Ownable {
      * @dev See {ICindr-setTaxFeePercent}.
      */
     function setTaxFeePercent(uint16 _taxFee) external onlyOwner {
-        _previousTaxFee = taxFee;
+        require(_taxFee <= 100, "Tax fee must be between 0 and 10%");
 
+        _previousTaxFee = taxFee;
         taxFee = _taxFee;
     }
 
@@ -318,8 +322,9 @@ contract Cindr is ICindr, Ownable {
      * @dev See {ICindr-setBurnFeePercent}.
      */
     function setBurnFeePercent(uint16 _burnFee) external onlyOwner {
-        _previousBurnFee = burnFee;
+        require(_burnFee <= 100, "Burn fee must be between 0 and 10%");
 
+        _previousBurnFee = burnFee;
         burnFee = _burnFee;
     }
 
@@ -327,8 +332,12 @@ contract Cindr is ICindr, Ownable {
      * @dev See {ICindr-setLiquidityFeePercent}.
      */
     function setLiquidityFeePercent(uint16 _liquidityFee) external onlyOwner {
-        _previousLiquidityFee = liquidityFee;
+        require(
+            _liquidityFee <= 100,
+            "Liquidity fee must be between 0 and 10%"
+        );
 
+        _previousLiquidityFee = liquidityFee;
         liquidityFee = _liquidityFee;
     }
 
@@ -336,8 +345,11 @@ contract Cindr is ICindr, Ownable {
      * @dev See {ICindr-setMarketingFeePercent}.
      */
     function setMarketingFeePercent(uint16 _marketingFee) external onlyOwner {
-        _previousLiquidityFee = marketingFee;
-
+        require(
+            _marketingFee <= 100,
+            "Marketing fee must be between 0 and 10%"
+        );
+        _previousMarketingFee = marketingFee;
         marketingFee = _marketingFee;
     }
 
@@ -345,7 +357,13 @@ contract Cindr is ICindr, Ownable {
      * @dev See {ICindr-setMaxTxPercent}.
      */
     function setMaxTxPercent(uint256 maxTxPercent) external onlyOwner {
-        _maxTxAmount = (_tTotal * (maxTxPercent)) / (10 ** 2);
+        require(
+            maxTxPercent <= 100,
+            "Max transaction percent must be between 0 and 10%"
+        );
+
+        _maxTxAmount = (_tTotal * (maxTxPercent)) / (10 ** 3);
+        emit MaxTxPercentUpdated(maxTxPercent);
     }
 
     /**
@@ -357,7 +375,17 @@ contract Cindr is ICindr, Ownable {
         emit SwapAndLiquifyEnabledUpdated(_enabled);
     }
 
-    /************************************************************************************************/
+    /**
+     * @dev Function to recover accidentally sent ETH
+     */
+    function recoverETH() external onlyOwner nonReentrant {
+        uint256 contractBalance = address(this).balance;
+        require(contractBalance > 0, "No ETH to recover");
+
+        payable(owner()).transfer(contractBalance);
+
+        emit TokensRecovered(owner(), contractBalance);
+    }
 
     /************************************************************************************************/
     /****************************** PUBLIC FUNCTIONS (ERC20 INTERFACE) ****************************/
@@ -871,7 +899,7 @@ contract Cindr is ICindr, Ownable {
      * @dev Swaps the specified amount of tokens for ETH
      * @param tokenAmount The amount of tokens to swap for ETH
      */
-    function _swapTokensForEth(uint256 tokenAmount) private {
+    function _swapTokensForEth(uint256 tokenAmount) private nonReentrant {
         // generate the uniswap pair path of token -> weth
         address[] memory path = new address[](2);
         path[0] = address(this);
@@ -882,7 +910,7 @@ contract Cindr is ICindr, Ownable {
         // make the swap
         uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
             tokenAmount,
-            0, // accept any amount of ETH
+            0, // (tokenAmount * 950) / 1000, // 15% slippage tolerance
             path,
             address(this),
             block.timestamp
@@ -902,9 +930,9 @@ contract Cindr is ICindr, Ownable {
         uniswapV2Router.addLiquidityETH{value: ethAmount}(
             address(this),
             tokenAmount,
-            0, // slippage is unavoidable
-            0, // slippage is unavoidable
-            owner(),
+            0, // (tokenAmount * 850) / 1000, // 15% slippage tolerance
+            0, // (ethAmount * 850) / 1000, // 15% slippage tolerance
+            address(this), // Send LP tokens to the contract itself
             block.timestamp
         );
     }

@@ -123,7 +123,7 @@ contract CindrTokenTest is Test {
     function test_InitialBalance() public {
         uint256 ownerBalance = CindrToken.balanceOf(address(this));
 
-        uint256 expectedBalance = 1000000000 * 10 ** 6 * 10 ** 9;
+        uint256 expectedBalance = 1_000_000_000 * 10 ** 6 * 10 ** 9;
 
         assertLe(
             ownerBalance,
@@ -212,7 +212,7 @@ contract CindrTokenTest is Test {
     }
 
     function test_RevertTaxFee() public {
-        vm.expectRevert(bytes("Tax fee must be between 0 and 100"));
+        vm.expectRevert(bytes("Tax fee must be between 0 and 10%"));
         new Cindr(
             "Cindr",
             "CND",
@@ -227,7 +227,7 @@ contract CindrTokenTest is Test {
     }
 
     function test_RevertBurnFee() public {
-        vm.expectRevert(bytes("Burn fee must be between 0 and 100"));
+        vm.expectRevert(bytes("Burn fee must be between 0 and 10%"));
         new Cindr(
             "Cindr",
             "CND",
@@ -242,7 +242,7 @@ contract CindrTokenTest is Test {
     }
 
     function test_RevertLiquidityFee() public {
-        vm.expectRevert(bytes("Liquidity fee must be between 0 and 100"));
+        vm.expectRevert(bytes("Liquidity fee must be between 0 and 10%"));
         new Cindr(
             "Cindr",
             "CND",
@@ -257,7 +257,7 @@ contract CindrTokenTest is Test {
     }
 
     function test_RevertMarketingFee() public {
-        vm.expectRevert(bytes("Marketing fee must be between 0 and 100"));
+        vm.expectRevert(bytes("Marketing fee must be between 0 and 10%"));
         new Cindr(
             "Cindr",
             "CND",
@@ -351,4 +351,71 @@ contract CindrTokenTest is Test {
             "Allowance should be decreased by the specified amount"
         );
     }
+
+    function test_RecoverETH_Success() public {
+        // Send some ETH to the contract
+        vm.deal(address(CindrToken), 10 ether);
+
+        // Check the contract balance before recovery
+        uint256 contractBalanceBefore = address(CindrToken).balance;
+        assertEq(
+            contractBalanceBefore,
+            10 ether,
+            "Contract should have 10 ether balance"
+        );
+
+        // Check owner's balance before recovery
+        uint256 ownerBalanceBefore = address(this).balance;
+
+        // Recover ETH
+        // vm.prank(owner);
+        CindrToken.recoverETH();
+
+        // Check the contract balance after recovery
+        uint256 contractBalanceAfter = address(CindrToken).balance;
+        assertEq(
+            contractBalanceAfter,
+            0,
+            "Contract balance should be 0 after recovery"
+        );
+
+        // Check owner's balance after recovery
+        uint256 ownerBalanceAfter = address(this).balance;
+        assertEq(
+            ownerBalanceAfter,
+            ownerBalanceBefore + 10 ether,
+            "Owner should have recovered 10 ether"
+        );
+    }
+
+    function test_RecoverETH_NoETHToRecover() public {
+        // Ensure contract has no ETH
+        assertEq(
+            address(CindrToken).balance,
+            0,
+            "Contract balance should be 0"
+        );
+
+        // Attempt to recover ETH and expect revert
+        // vm.prank(owner);
+        vm.expectRevert("No ETH to recover");
+        CindrToken.recoverETH();
+    }
+
+    function test_RecoverETH_OnlyOwner() public {
+        // Send some ETH to the contract
+        vm.deal(address(CindrToken), 10 ether);
+
+        // Attempt to recover ETH from a non-owner address and expect revert
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                user1
+            )
+        );
+        vm.prank(user1);
+        CindrToken.recoverETH();
+    }
+
+    fallback() external payable {}
 }
