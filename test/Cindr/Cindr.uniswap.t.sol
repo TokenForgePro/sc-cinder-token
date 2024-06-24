@@ -48,11 +48,7 @@ contract CindrUniswapTest is Test {
             "CND",
             totalSupply,
             UNISWAP_V2_ROUTER02,
-            marketingWallet,
-            _taxFee, // _taxFee 1.5%
-            _burnFee, // _burnFee 1.5%
-            _liquidityFee, // _liquidityFee 1%
-            _marketingFee // _marketingFee 1%
+            marketingWallet
         );
 
         uniswapV2Router = IUniswapV2Router02(UNISWAP_V2_ROUTER02);
@@ -75,7 +71,6 @@ contract CindrUniswapTest is Test {
 
     function test_SwapAndLiquify_Internal() public {
         uint256 tokenAmount = 1_000_000 * 10 ** 9;
-        CindrToken.setSwapAndLiquifyEnabled(true);
 
         uint256 initialContractTokenBalance = CindrToken.balanceOf(
             address(CindrToken)
@@ -143,7 +138,6 @@ contract CindrUniswapTest is Test {
 
     function test_TakeLiquidity() public {
         // Exclude the contract from rewards
-        CindrToken.excludeFromReward(address(CindrToken));
 
         uint256 initialContractTokenBalance = CindrToken.balanceOf(
             address(CindrToken)

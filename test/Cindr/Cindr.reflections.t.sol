@@ -40,11 +40,7 @@ contract CindrTokenTest is Test {
             "CND",
             1_000_000_000,
             UNISWAP_V2_ROUTER02,
-            marketingWallet,
-            _taxFee, // _taxFee 1.5%
-            _burnFee, // _burnFee 1.5%
-            _liquidityFee, // _liquidityFee 1%
-            _marketingFee // _marketingFee 1%
+            marketingWallet
         );
 
         // Transfer some tokens to user1 for testing
@@ -76,21 +72,6 @@ contract CindrTokenTest is Test {
             tAmountFromReflection,
             "tAmount should match tAmountFromReflection"
         );
-    }
-
-    function test_ExcludeFromReward() public {
-        CindrToken.excludeFromReward(user1);
-        bool isExcluded = CindrToken.isExcludedFromReward(user1);
-
-        assertTrue(isExcluded, "User1 should be excluded from reward");
-    }
-
-    function test_IncludeInReward() public {
-        CindrToken.excludeFromReward(user1);
-        CindrToken.includeInReward(user1);
-        bool isExcluded = CindrToken.isExcludedFromReward(user1);
-
-        assertFalse(isExcluded, "User1 should be included in reward");
     }
 
     function test_Deliver() public {

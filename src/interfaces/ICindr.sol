@@ -101,66 +101,6 @@ interface ICindr is IERC20 {
     ) external view returns (uint256);
 
     /**
-     * @dev Excludes an account from receiving rewards.
-     * @param account The address to exclude.
-     */
-    function excludeFromReward(address account) external;
-
-    /**
-     * @dev Includes an account in receiving rewards.
-     * @param account The address to include.
-     */
-    function includeInReward(address account) external;
-
-    /**
-     * @dev Excludes an account from paying fees.
-     * @param account The address to exclude.
-     */
-    function excludeFromFee(address account) external;
-
-    /**
-     * @dev Includes an account in paying fees.
-     * @param account The address to include.
-     */
-    function includeInFee(address account) external;
-
-    /**
-     * @dev Sets the tax fee percentage.
-     * @param _taxFee The tax fee percentage.
-     */
-    function setTaxFeePercent(uint16 _taxFee) external;
-
-    /**
-     * @dev Sets the burn fee percentage.
-     * @param _burnFee The burn fee percentage.
-     */
-    function setBurnFeePercent(uint16 _burnFee) external;
-
-    /**
-     * @dev Sets the liquidity fee percentage.
-     * @param _liquidityFee The liquidity fee percentage.
-     */
-    function setLiquidityFeePercent(uint16 _liquidityFee) external;
-
-    /**
-     * @dev Sets the marketing fee percentage.
-     * @param _marketingFee The marketing fee percentage.
-     */
-    function setMarketingFeePercent(uint16 _marketingFee) external;
-
-    /**
-     * @dev Sets the maximum transaction percentage.
-     * @param maxTxPercent The maximum transaction percentage.
-     */
-    function setMaxTxPercent(uint256 maxTxPercent) external;
-
-    /**
-     * @dev Enables or disables swap and liquify.
-     * @param _enabled Whether swap and liquify is enabled.
-     */
-    function setSwapAndLiquifyEnabled(bool _enabled) external;
-
-    /**
      * @dev Receives Ether to the contract.
      */
     receive() external payable;

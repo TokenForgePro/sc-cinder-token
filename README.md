@@ -80,11 +80,7 @@ Cindr takes inspiration from the Safemoon token, which gained popularity for its
                "Cindr Token",           // Name
                "Cindr",                 // Symbol
                0xYourRouterAddress,      // UniswapV2Router Address
-               0xYourMarketingWallet,    // Marketing Wallet Address
-               15,                        // Tax Fee  1.5%
-               15,                        // Burn Fee  1.5%
-               10,                        // Liquidity Fee 1%
-               10                         // Marketing Fee 1%
+               0xYourMarketingWallet    // Marketing Wallet Address
            );
 
            vm.stopBroadcast();

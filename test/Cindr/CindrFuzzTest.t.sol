@@ -43,11 +43,7 @@ contract CindrFuzzTest is Test {
             "CND",
             totalSupply,
             UNISWAP_V2_ROUTER02,
-            marketingWallet,
-            _taxFee,
-            _burnFee,
-            _liquidityFee,
-            _marketingFee
+            marketingWallet
         );
 
         uniswapV2Router = IUniswapV2Router02(UNISWAP_V2_ROUTER02);
@@ -87,37 +83,6 @@ contract CindrFuzzTest is Test {
         // Check balances
         assertGe(CindrToken.balanceOf(user1), 0);
         assertGe(CindrToken.balanceOf(user2), 0);
-    }
-
-    function testFuzz_SetFees(
-        uint16 newTaxFee,
-        uint16 newBurnFee,
-        uint16 newLiquidityFee,
-        uint16 newMarketingFee
-    ) public {
-        // Ensure new fee values are within valid range
-        newTaxFee = uint16(bound(newTaxFee, 10, 100)); // from 1% to 10% no need for more  than 10% as max
-        newBurnFee = uint16(bound(newBurnFee, 10, 100)); // from 1% to 10% no need for more  than 10% as max
-        newLiquidityFee = uint16(bound(newLiquidityFee, 10, 100)); // from 1% to 10% no need for more  than 10% as max
-        newMarketingFee = uint16(bound(newMarketingFee, 10, 100)); // from 1% to 10% no need for more  than 10% as max
-
-        // vm.prank(owner);
-        CindrToken.setTaxFeePercent(newTaxFee);
-
-        // vm.prank(owner);
-        CindrToken.setBurnFeePercent(newBurnFee);
-
-        // vm.prank(owner);
-        CindrToken.setLiquidityFeePercent(newLiquidityFee);
-
-        // vm.prank(owner);
-        CindrToken.setMarketingFeePercent(newMarketingFee);
-
-        // Assert the new fees are set correctly
-        assertEq(CindrToken.taxFee(), newTaxFee);
-        assertEq(CindrToken.burnFee(), newBurnFee);
-        assertEq(CindrToken.liquidityFee(), newLiquidityFee);
-        assertEq(CindrToken.marketingFee(), newMarketingFee);
     }
 
     function testFuzz_TakeBurnFromTAmount(uint256 tAmount) public {
@@ -166,10 +131,6 @@ contract CindrFuzzTest is Test {
         // Ensure tAmount is within valid range
         tAmount = bound(tAmount, 1, CindrToken.balanceOf(user1));
 
-        // Exclude user1 from reward to enable deliver function
-        // vm.prank(owner);
-        // CindrToken.excludeFromReward(user1);
-
         // Deliver reflections
         vm.prank(user1);
         CindrToken.deliver(tAmount);
@@ -182,10 +143,6 @@ contract CindrFuzzTest is Test {
     function testFuzz_ExcludedFromFeeTransfer(uint256 amount) public {
         // Ensure amount is within valid range
         amount = bound(amount, 1, CindrToken.balanceOf(user1));
-
-        // Exclude marketing wallet from fee
-        // vm.prank(owner);
-        CindrToken.excludeFromFee(marketingWallet);
 
         // Perform transfer
         vm.prank(user1);
@@ -212,10 +169,6 @@ contract CindrFuzzTest is Test {
         // Ensure amount is within valid range
         amount = bound(amount, 1, CindrToken.balanceOf(user1));
 
-        // Exclude user1 from reward
-        // vm.prank(owner);
-        CindrToken.excludeFromReward(user1);
-
         // Perform transfer
         vm.prank(user1);
         CindrToken.transfer(user2, amount);
@@ -225,33 +178,12 @@ contract CindrFuzzTest is Test {
         assertGe(CindrToken.balanceOf(user2), amount);
     }
 
-    function testFuzz_ExcludedFromReward(uint256 amount) public {
-        // Ensure amount is within valid range
-        amount = bound(amount, 1, CindrToken.balanceOf(user1));
-
-        // Exclude user2 wallet from reward
-        // vm.prank(owner);
-        CindrToken.excludeFromReward(user2);
-
-        // Perform transfer
-        vm.prank(user1);
-        CindrToken.transfer(user2, amount);
-
-        // Check if user2 wallet is excluded from reward
-        bool isExcluded = CindrToken.isExcludedFromReward(user2);
-        assertTrue(isExcluded);
-
-        // Check balance of user2 wallet
-        assertGe(CindrToken.balanceOf(user2), amount);
-    }
-
     function testFuzz_SwapAndLiquify(uint256 amount) public {
         // Ensure amount is within valid range
         amount = bound(amount, 1, CindrToken.balanceOf(user1));
 
         // Enable swap and liquify
         // vm.prank(owner);
-        CindrToken.setSwapAndLiquifyEnabled(true);
 
         // Perform transfer to trigger swap and liquify
         vm.prank(user1);
@@ -262,39 +194,9 @@ contract CindrFuzzTest is Test {
         assertGe(contractEthBalance, 0);
     }
 
-    function testFuzz_MaxTxAmount(
-        uint256 newMaxTxPercent,
-        uint256 transferAmount
-    ) public {
-        // Ensure new max tx percent is within valid range
-        newMaxTxPercent = bound(newMaxTxPercent, 10, 100); // from 1% to 10% no need for more  than 10% as max
-
-        // Set new max tx amount
-        // vm.prank(owner);
-        CindrToken.setMaxTxPercent(newMaxTxPercent);
-
-        // Ensure transfer amount is within new max tx amount
-        uint256 maxTxAmount = (CindrToken.totalSupply() * newMaxTxPercent) /
-            100;
-
-        transferAmount = bound(transferAmount, 1 * 10 ** 9, maxTxAmount);
-
-        // Perform transfer
-        vm.prank(user1);
-        // CindrToken.transfer(user2, transferAmount);
-
-        // Check balances
-        assertGe(CindrToken.balanceOf(user1), 0);
-        assertGe(CindrToken.balanceOf(user2), 0);
-    }
-
     function testFuzz_LiquidityAndSwap(uint256 amount) public {
         // Ensure amount is within valid range
         amount = bound(amount, 1, CindrToken.balanceOf(user1));
-
-        // Enable swap and liquify
-        // vm.prank(owner);
-        CindrToken.setSwapAndLiquifyEnabled(true);
 
         // Perform transfer to trigger swap and liquify
         vm.prank(user1);
@@ -308,40 +210,5 @@ contract CindrFuzzTest is Test {
 
         assertGe(contractEthBalance, 0);
         assertGe(contractTokenBalance, 0);
-    }
-
-    function testFuzz_SetFeesAndTransfer(
-        uint16 newTaxFee,
-        uint16 newBurnFee,
-        uint16 newLiquidityFee,
-        uint16 newMarketingFee,
-        uint256 amount
-    ) public {
-        // Ensure new fee values are within valid range
-        newTaxFee = uint16(bound(newTaxFee, 10, 100));
-        newBurnFee = uint16(bound(newBurnFee, 10, 100));
-        newLiquidityFee = uint16(bound(newLiquidityFee, 10, 100));
-        newMarketingFee = uint16(bound(newMarketingFee, 10, 100));
-
-        // Set new fees
-        // vm.prank(owner);
-        CindrToken.setTaxFeePercent(newTaxFee);
-        // vm.prank(owner);
-        CindrToken.setBurnFeePercent(newBurnFee);
-        // vm.prank(owner);
-        CindrToken.setLiquidityFeePercent(newLiquidityFee);
-        // vm.prank(owner);
-        CindrToken.setMarketingFeePercent(newMarketingFee);
-
-        // Ensure amount is within valid range
-        amount = bound(amount, 1 * 10 ** 9, CindrToken.balanceOf(user1));
-
-        // Perform transfer to apply new fees
-        vm.prank(user1);
-        CindrToken.transfer(user2, amount);
-
-        // Check balances
-        assertGe(CindrToken.balanceOf(user1), 0);
-        assertGe(CindrToken.balanceOf(user2), amount);
     }
 }

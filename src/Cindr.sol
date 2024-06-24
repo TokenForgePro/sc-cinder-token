@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Unlicensed
 pragma solidity ^0.8.23;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -14,7 +13,7 @@ import {ICindr} from "src/interfaces/ICindr.sol";
  * @dev Implementation of the Cindr Token with reflection mechanism, auto liquidity, and fees for marketing and development.
  * Inspired by SafeMoon mechanisms and code: https://github.com/safemoonprotocol/Safemoon.sol/blob/main/Safemoon.sol
  */
-contract Cindr is ICindr, Ownable, ReentrancyGuard {
+contract Cindr is ICindr, Context, ReentrancyGuard {
     /************************************* Token description ****************************************/
     /// @notice Token name
     string private _name;
@@ -60,28 +59,16 @@ contract Cindr is ICindr, Ownable, ReentrancyGuard {
     uint256 private _tFeeTotal;
 
     /// @notice Current tax fee percentage
-    uint16 public taxFee;
-
-    /// @notice Previous tax fee percentage
-    uint16 private _previousTaxFee = taxFee;
+    uint16 public constant taxFee = 15; // 1.5%;
 
     /// @notice Current burn fee percentage
-    uint16 public burnFee;
-
-    /// @notice Previous burn fee percentage
-    uint16 private _previousBurnFee = burnFee;
+    uint16 public constant burnFee = 15; // 1.5%;
 
     /// @notice Current liquidity fee percentage
-    uint16 public liquidityFee;
-
-    /// @notice Previous liquidity fee percentage
-    uint16 private _previousLiquidityFee = liquidityFee;
+    uint16 public constant liquidityFee = 10; // 1%;
 
     /// @notice Current marketing fee percentage
-    uint16 public marketingFee;
-
-    /// @notice Previous marketing fee percentage
-    uint16 private _previousMarketingFee = marketingFee;
+    uint16 public constant marketingFee = 10; // 1%;
 
     /************************************************************************************************/
 
@@ -105,10 +92,11 @@ contract Cindr is ICindr, Ownable, ReentrancyGuard {
     bool public swapAndLiquifyEnabled = true;
 
     /// @notice Maximum transaction amount
-    uint256 public _maxTxAmount = 5_000_000 * 10 ** 6 * 10 ** 9;
+    uint256 public constant _maxTxAmount = 5_000_000 * 10 ** 6 * 10 ** 9;
 
     /// @notice Number of tokens to sell and add to liquidity
-    uint256 private numTokensSellToAddToLiquidity = 5_000_000 * 10 ** 9;
+    uint256 private constant numTokensSellToAddToLiquidity =
+        5_000_000 * 10 ** 9;
 
     /********************************* Events ************************************/
     /**
@@ -128,22 +116,14 @@ contract Cindr is ICindr, Ownable, ReentrancyGuard {
      * @param totalSupply_ Total Supply of the token
      * @param _uniswapV2RouterAddress Address of the UniswapV2Router
      * @param _marketingWallet Address of the marketing wallet
-     * @param _taxFee Tax fee percentage
-     * @param _burnFee Burn fee percentage
-     * @param _liquidityFee Liquidity fee percentage
-     * @param _marketingFee Marketing fee percentage
      */
     constructor(
         string memory name_,
         string memory symbol_,
         uint256 totalSupply_,
         address _uniswapV2RouterAddress,
-        address _marketingWallet,
-        uint16 _taxFee,
-        uint16 _burnFee,
-        uint16 _liquidityFee,
-        uint16 _marketingFee
-    ) Ownable(_msgSender()) {
+        address _marketingWallet
+    ) {
         // Ensure the parameters are valid
         require(bytes(name_).length > 0, "Token name cannot be empty");
         require(bytes(symbol_).length > 0, "Token symbol cannot be empty");
@@ -156,16 +136,6 @@ contract Cindr is ICindr, Ownable, ReentrancyGuard {
             _marketingWallet != address(0),
             "Marketing wallet address cannot be zero address"
         );
-        require(_taxFee <= 100, "Tax fee must be between 0 and 10%");
-        require(_burnFee <= 100, "Burn fee must be between 0 and 10%");
-        require(
-            _liquidityFee <= 100,
-            "Liquidity fee must be between 0 and 10%"
-        );
-        require(
-            _marketingFee <= 100,
-            "Marketing fee must be between 0 and 10%"
-        );
 
         _tTotal = totalSupply_ * 10 ** 6 * 10 ** _decimals;
         _rTotal = (MAX - (MAX % _tTotal));
@@ -173,11 +143,6 @@ contract Cindr is ICindr, Ownable, ReentrancyGuard {
 
         _name = name_;
         _symbol = symbol_;
-
-        taxFee = _taxFee;
-        burnFee = _burnFee;
-        liquidityFee = _liquidityFee;
-        marketingFee = _marketingFee;
 
         marketingWallet = _marketingWallet;
 
@@ -192,8 +157,7 @@ contract Cindr is ICindr, Ownable, ReentrancyGuard {
         // Set the rest of the contract variables
         uniswapV2Router = _uniswapV2Router;
 
-        // Exclude owner and this contract from fee
-        _isExcludedFromFee[owner()] = true;
+        // Exclude this contract from fee
         _isExcludedFromFee[uniswapV2Pair] = true;
         _isExcludedFromFee[address(this)] = true;
 
@@ -253,138 +217,6 @@ contract Cindr is ICindr, Ownable, ReentrancyGuard {
             (, uint256 rTransferAmount, , , , ) = _getValues(tAmount);
             return rTransferAmount;
         }
-    }
-
-    /**
-     * @dev See {ICindr-excludeFromReward}.
-     */
-    function excludeFromReward(address account) external onlyOwner {
-        require(account != address(0), "Account is the zero address");
-
-        require(
-            account != address(uniswapV2Router),
-            "We can not exclude Uniswap router."
-        );
-
-        require(!_isExcluded[account], "Account is already excluded");
-
-        if (_rOwned[account] > 0) {
-            _tOwned[account] = tokenFromReflection(_rOwned[account]);
-        }
-
-        _isExcluded[account] = true;
-        _excluded.push(account);
-    }
-
-    /**
-     * @dev See {ICindr-includeInReward}.
-     */
-    function includeInReward(address account) external onlyOwner {
-        require(account != address(0), "Account is the zero address");
-
-        require(_isExcluded[account], "Account is already excluded");
-        for (uint256 i = 0; i < _excluded.length; i++) {
-            if (_excluded[i] == account) {
-                _excluded[i] = _excluded[_excluded.length - 1];
-                _tOwned[account] = 0;
-                _isExcluded[account] = false;
-                _excluded.pop();
-                break;
-            }
-        }
-    }
-
-    /**
-     * @dev See {ICindr-excludeFromFee}.
-     */
-    function excludeFromFee(address account) external onlyOwner {
-        _isExcludedFromFee[account] = true;
-    }
-
-    /**
-     * @dev See {ICindr-includeInFee}.
-     */
-    function includeInFee(address account) external onlyOwner {
-        _isExcludedFromFee[account] = false;
-    }
-
-    /**
-     * @dev See {ICindr-setTaxFeePercent}.
-     */
-    function setTaxFeePercent(uint16 _taxFee) external onlyOwner {
-        require(_taxFee <= 100, "Tax fee must be between 0 and 10%");
-
-        _previousTaxFee = taxFee;
-        taxFee = _taxFee;
-    }
-
-    /**
-     * @dev See {ICindr-setBurnFeePercent}.
-     */
-    function setBurnFeePercent(uint16 _burnFee) external onlyOwner {
-        require(_burnFee <= 100, "Burn fee must be between 0 and 10%");
-
-        _previousBurnFee = burnFee;
-        burnFee = _burnFee;
-    }
-
-    /**
-     * @dev See {ICindr-setLiquidityFeePercent}.
-     */
-    function setLiquidityFeePercent(uint16 _liquidityFee) external onlyOwner {
-        require(
-            _liquidityFee <= 100,
-            "Liquidity fee must be between 0 and 10%"
-        );
-
-        _previousLiquidityFee = liquidityFee;
-        liquidityFee = _liquidityFee;
-    }
-
-    /**
-     * @dev See {ICindr-setMarketingFeePercent}.
-     */
-    function setMarketingFeePercent(uint16 _marketingFee) external onlyOwner {
-        require(
-            _marketingFee <= 100,
-            "Marketing fee must be between 0 and 10%"
-        );
-        _previousMarketingFee = marketingFee;
-        marketingFee = _marketingFee;
-    }
-
-    /**
-     * @dev See {ICindr-setMaxTxPercent}.
-     */
-    function setMaxTxPercent(uint256 maxTxPercent) external onlyOwner {
-        require(
-            maxTxPercent <= 100,
-            "Max transaction percent must be between 0 and 10%"
-        );
-
-        _maxTxAmount = (_tTotal * (maxTxPercent)) / (10 ** 3);
-        emit MaxTxPercentUpdated(maxTxPercent);
-    }
-
-    /**
-     * @dev See {ICindr-setSwapAndLiquifyEnabled}.
-     */
-    function setSwapAndLiquifyEnabled(bool _enabled) external onlyOwner {
-        swapAndLiquifyEnabled = _enabled;
-
-        emit SwapAndLiquifyEnabledUpdated(_enabled);
-    }
-
-    /**
-     * @dev Function to recover accidentally sent ETH
-     */
-    function recoverETH() external onlyOwner nonReentrant {
-        uint256 contractBalance = address(this).balance;
-        require(contractBalance > 0, "No ETH to recover");
-
-        payable(owner()).transfer(contractBalance);
-
-        emit TokensRecovered(owner(), contractBalance);
     }
 
     /************************************************************************************************/
@@ -561,30 +393,6 @@ contract Cindr is ICindr, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Removes all fees by setting them to 0 and stores their previous values
-     */
-    function _removeAllFee() private {
-        if (
-            taxFee == 0 &&
-            liquidityFee == 0 &&
-            burnFee == 0 &&
-            marketingFee == 0
-        ) return;
-
-        _previousTaxFee = taxFee;
-        _previousLiquidityFee = liquidityFee;
-        _previousBurnFee = burnFee;
-        _previousMarketingFee = marketingFee;
-    }
-
-    function _restoreAllFee() private {
-        taxFee = _previousTaxFee;
-        liquidityFee = _previousLiquidityFee;
-        burnFee = _previousBurnFee;
-        marketingFee = _previousMarketingFee;
-    }
-
-    /**
      * @dev Transfers tokens between addresses with fee considerations
      * @param sender The address sending the tokens
      * @param recipient The address receiving the tokens
@@ -597,21 +405,7 @@ contract Cindr is ICindr, Ownable, ReentrancyGuard {
         uint256 amount,
         bool takeFee
     ) private {
-        if (!takeFee) _removeAllFee();
-
-        if (_isExcluded[sender] && !_isExcluded[recipient]) {
-            _transferFromExcluded(sender, recipient, amount);
-        } else if (!_isExcluded[sender] && _isExcluded[recipient]) {
-            _transferToExcluded(sender, recipient, amount);
-        } else if (!_isExcluded[sender] && !_isExcluded[recipient]) {
-            _transferStandard(sender, recipient, amount);
-        } else if (_isExcluded[sender] && _isExcluded[recipient]) {
-            _transferBothExcluded(sender, recipient, amount);
-        } else {
-            _transferStandard(sender, recipient, amount);
-        }
-
-        if (!takeFee) _restoreAllFee();
+        _transferStandard(sender, recipient, amount);
     }
 
     /**
@@ -648,139 +442,6 @@ contract Cindr is ICindr, Ownable, ReentrancyGuard {
 
         _reflectFee(rFee, tFee);
 
-        emit Transfer(sender, recipient, tTransferAmount);
-    }
-
-    /**
-     * @dev Transfers tokens to an excluded address with fee considerations
-     * @param sender The address sending the tokens
-     * @param recipient The address receiving the tokens
-     * @param tAmount The amount of tokens to transfer
-     */
-    function _transferToExcluded(
-        address sender,
-        address recipient,
-        uint256 tAmount
-    ) private {
-        (
-            uint256 rAmount,
-            uint256 rTransferAmount,
-            uint256 rFee,
-            uint256 tTransferAmount,
-            uint256 tFee,
-            uint256 tLiquidity
-        ) = _getValues(tAmount);
-
-        if (_rOwned[sender] < rAmount) {
-            revert InsufficientBalance(sender, _rOwned[sender], rAmount);
-        }
-
-        _rOwned[sender] -= rAmount;
-        _tOwned[recipient] += tTransferAmount;
-
-        _rOwned[recipient] += rTransferAmount;
-
-        _takeLiquidity(tLiquidity);
-
-        _takeBurnFromTAmount(tAmount);
-        _takeMarketingFromTAmount(tAmount);
-
-        _reflectFee(rFee, tFee);
-
-        emit Transfer(sender, recipient, tTransferAmount);
-    }
-
-    /**
-     * @dev Transfers tokens from an excluded address with fee considerations
-     * @param sender The address sending the tokens
-     * @param recipient The address receiving the tokens
-     * @param tAmount The amount of tokens to transfer
-     */
-    function _transferFromExcluded(
-        address sender,
-        address recipient,
-        uint256 tAmount
-    ) private {
-        (
-            uint256 rAmount,
-            uint256 rTransferAmount,
-            uint256 rFee,
-            uint256 tTransferAmount,
-            uint256 tFee,
-            uint256 tLiquidity
-        ) = _getValues(tAmount);
-
-        if (_tOwned[sender] < tAmount) {
-            revert InsufficientBalance(sender, _tOwned[sender], tAmount);
-        }
-
-        if (_rOwned[sender] < rAmount) {
-            revert InsufficientReflectionBalance(
-                sender,
-                _rOwned[sender],
-                rAmount
-            );
-        }
-
-        _tOwned[sender] -= tAmount;
-        _rOwned[sender] -= rAmount;
-
-        _rOwned[recipient] += rTransferAmount;
-
-        _takeLiquidity(tLiquidity);
-
-        _takeBurnFromTAmount(tAmount);
-        _takeMarketingFromTAmount(tAmount);
-
-        _reflectFee(rFee, tFee);
-
-        emit Transfer(sender, recipient, tTransferAmount);
-    }
-
-    /**
-     * @dev Transfers tokens between two excluded addresses with fee considerations
-     * @param sender The address sending the tokens
-     * @param recipient The address receiving the tokens
-     * @param tAmount The amount of tokens to transfer
-     */
-    function _transferBothExcluded(
-        address sender,
-        address recipient,
-        uint256 tAmount
-    ) private {
-        (
-            uint256 rAmount,
-            uint256 rTransferAmount,
-            uint256 rFee,
-            uint256 tTransferAmount,
-            uint256 tFee,
-            uint256 tLiquidity
-        ) = _getValues(tAmount);
-
-        if (_tOwned[sender] < tAmount) {
-            revert InsufficientBalance(sender, _tOwned[sender], tAmount);
-        }
-
-        if (_rOwned[sender] < rAmount) {
-            revert InsufficientReflectionBalance(
-                sender,
-                _rOwned[sender],
-                rAmount
-            );
-        }
-
-        _tOwned[sender] -= tAmount;
-        _rOwned[sender] -= rAmount;
-
-        _tOwned[recipient] += tTransferAmount;
-        _rOwned[recipient] += rTransferAmount;
-
-        _takeLiquidity(tLiquidity);
-
-        _takeBurnFromTAmount(tAmount);
-        _takeMarketingFromTAmount(tAmount);
-
-        _reflectFee(rFee, tFee);
         emit Transfer(sender, recipient, tTransferAmount);
     }
 
@@ -826,12 +487,6 @@ contract Cindr is ICindr, Ownable, ReentrancyGuard {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
-
-        if (from != owner() && to != owner())
-            require(
-                amount <= _maxTxAmount,
-                "Transfer amount exceeds the maxTxAmount."
-            );
 
         // is the token balance of this contract address over the min number of
         // tokens that we need to initiate a swap + liquidity lock?
